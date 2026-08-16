@@ -1,0 +1,44 @@
+{
+  "name": "escape-the-monster",
+  "version": "2.2.0",
+  "private": true,
+  "description": "Optimized 2D Escape the Monster game with 30 progressive levels, boundary damage, persistent wallet and low-latency movement.",
+  "scripts": {
+    "start": "ng serve",
+    "build": "ng build --configuration production",
+    "build:dev": "ng build",
+    "test": "ng test --watch=false --browsers=ChromeHeadless",
+    "cap:sync": "cap sync",
+    "android:add": "cap add android",
+    "android:open": "cap open android",
+    "ionic:serve": "ng serve"
+  },
+  "dependencies": {
+    "@angular/animations": "^20.2.0",
+    "@angular/common": "^20.2.0",
+    "@angular/compiler": "^20.2.0",
+    "@angular/core": "^20.2.0",
+    "@angular/forms": "^20.2.0",
+    "@angular/platform-browser": "^20.2.0",
+    "@angular/platform-browser-dynamic": "^20.2.0",
+    "@angular/router": "^20.2.0",
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@ionic/angular": "^8.7.6",
+    "ionicons": "^7.4.0",
+    "rxjs": "~7.8.2",
+    "tslib": "^2.8.1",
+    "zone.js": "~0.15.1"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^20.2.0",
+    "@angular/cli": "^20.2.0",
+    "@angular/compiler-cli": "^20.2.0",
+    "@capacitor/cli": "^7.4.3",
+    "typescript": "~5.9.2"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  }
+}
