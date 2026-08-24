@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, ViewEncaps
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 
-type Screen = 'home' | 'game' | 'shop' | 'result' | 'settings';
+type Screen = 'home' | 'game' | 'shop' | 'result' | 'settings' | 'profile';
 type Power = 'shield' | 'magnet' | 'speed';
 interface Point { x: number; y: number; }
 
@@ -19,7 +19,8 @@ const STORAGE = {
   shields: 'etm-shields',
   magnets: 'etm-magnets',
   speedBoosts: 'etm-speed-boosts',
-  rewardedAdNext: 'etm-rewarded-ad-next-available'
+  rewardedAdNext: 'etm-rewarded-ad-next-available',
+  withdrawMobile: 'etm-withdraw-mobile'
 } as const;
 
 function readStoredNumber(key: string, fallback: number): number {
@@ -35,6 +36,15 @@ function readStoredBool(key: string, fallback: boolean): boolean {
   try {
     const value = localStorage.getItem(key);
     return value === null ? fallback : value === 'true';
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredString(key: string, fallback: string): string {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value;
   } catch {
     return fallback;
   }
@@ -56,6 +66,7 @@ function readStoredBool(key: string, fallback: boolean): boolean {
         </button>
         <div class="top-actions">
           <div class="wallet"><span class="coin-mini"></span> {{ coins() }}</div>
+          <button class="icon-button" type="button" (click)="go('profile')" aria-label="Profile">👤</button>
           <button class="icon-button" type="button" (click)="go('settings')" aria-label="Settings">⚙</button>
         </div>
       </header>
@@ -99,9 +110,7 @@ export class AppComponent implements OnDestroy {
   readonly musicVolume = signal(readStoredNumber(STORAGE.musicVolume, 100));
   readonly sfxVolume = signal(readStoredNumber(STORAGE.sfxVolume, 92));
   readonly vibrationEnabled = signal(readStoredBool(STORAGE.vibration, true));
-  readonly creditNumber = signal('');
-  readonly creditSubmitting = signal(false);
-  readonly creditSuccess = signal(false);
+  readonly withdrawMobileNumber = signal(readStoredString(STORAGE.withdrawMobile, ''));
   readonly shieldCount = signal(Math.floor(readStoredNumber(STORAGE.shields, 0)));
   readonly magnetCount = signal(Math.floor(readStoredNumber(STORAGE.magnets, 0)));
   readonly speedBoostCount = signal(Math.floor(readStoredNumber(STORAGE.speedBoosts, 0)));
@@ -156,7 +165,7 @@ export class AppComponent implements OnDestroy {
       .subscribe(event => {
         const path = event.urlAfterRedirects.split('?')[0].replace(/\/$/, '');
         const routeScreen: Record<string, Screen> = {
-          '/home': 'home', '/play': 'game', '/shop': 'shop', '/settings': 'settings', '/result': 'result'
+          '/home': 'home', '/play': 'game', '/shop': 'shop', '/settings': 'settings', '/result': 'result', '/profile': 'profile'
         };
         const next = routeScreen[path] ?? 'home';
         if (next !== 'game' && this.screen() === 'game') this.stopGameLoop();
@@ -555,7 +564,8 @@ export class AppComponent implements OnDestroy {
       game: '/play',
       shop: '/shop',
       result: '/result',
-      settings: '/settings'
+      settings: '/settings',
+      profile: '/profile'
     };
     void this.router.navigateByUrl(route[screen]);
     if (screen === 'settings' && this.musicEnabled()) this.startMusic();
@@ -605,43 +615,24 @@ export class AppComponent implements OnDestroy {
     if (next) this.vibrate(35);
   }
 
-  get showCreditForm(): boolean {
-    return this.coins() >= 1000 && !this.creditSuccess();
-  }
-
-  creditNumberValid(): boolean {
-    return /^\d{10}$/.test(this.creditNumber());
-  }
-
-  setCreditNumber(event: Event): void {
+  setWithdrawMobileNumber(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.creditNumber.set(input.value.replace(/\D/g, '').slice(0, 10));
+    const next = input.value.replace(/\D/g, '').slice(0, 10);
+    this.withdrawMobileNumber.set(next);
+    try { localStorage.setItem(STORAGE.withdrawMobile, next); } catch {}
   }
 
-  submitCreditRequest(): void {
-    if (this.creditSubmitting() || !this.showCreditForm || !this.creditNumberValid()) {
-      this.message.set('ENTER A VALID 10-DIGIT NUMBER');
-      window.setTimeout(() => this.message.set(''), 1200);
-      return;
-    }
-
-    // API integration placeholder:
-    // 1) call your future credit API with this.creditNumber()
-    // 2) when the API returns a successful response, call completeCreditRequestSuccess()
-    this.creditSubmitting.set(true);
-    this.message.set('READY FOR CREDIT API • WAITING FOR SERVER');
-    window.setTimeout(() => {
-      this.creditSubmitting.set(false);
-      this.message.set('');
-    }, 1200);
-  }
-
-  completeCreditRequestSuccess(): void {
-    this.creditSubmitting.set(false);
-    this.creditSuccess.set(true);
-    this.creditNumber.set('');
-    this.message.set('CREDIT REQUEST SUCCESSFUL');
-    window.setTimeout(() => this.message.set(''), 1500);
+  /**
+   * The only place allowed to mutate the coin balance after a withdrawal.
+   * Called by ProfilePageComponent only after the Central Redemption API has
+   * confirmed the redemption — never before, and never on a failed/uncertain
+   * response. The backend only tracks the Earnivo rupee wallet, not this
+   * game's local coin count, so the confirmed redeemed amount is subtracted
+   * from the local balance here.
+   */
+  redeemCoinsSuccessfully(coinsRedeemed: number): void {
+    this.coins.set(Math.max(0, this.coins() - Math.max(0, Math.floor(coinsRedeemed))));
+    this.saveCoins();
   }
 
   resetProgress(): void {
