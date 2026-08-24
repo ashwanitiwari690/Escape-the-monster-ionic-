@@ -2127,7 +2127,7 @@
   }
 }
 /* v1.7 page routing + safe persistence */
-app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page { display:block; min-height:calc(100dvh - 64px); }
+app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page, app-profile-page { display:block; min-height:calc(100dvh - 64px); }
 .game .level-banner { margin: 4px 0 5px; }
 .game .world { border-radius: 20px; }
 .result-coin { vertical-align:middle; }
@@ -2178,6 +2178,21 @@ app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page 
 .credit-wallet span{font-size:10px;font-weight:900;letter-spacing:.8px;color:#9fb2cd}
 .credit-wallet strong{font-size:22px;line-height:1;color:#ffd35c;text-shadow:0 0 12px #ffbd4a33}
 .credit-card .credit-note{display:block;margin-top:8px}
+
+.withdraw-summary{display:flex;flex-direction:column;gap:6px;margin:2px 0 10px}
+.withdraw-summary div{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid #2f4770;border-radius:11px;background:#0d1a2d}
+.withdraw-summary span{font-size:9px;font-weight:900;letter-spacing:.6px;color:#9fb2cd}
+.withdraw-summary b{font-size:13px;color:#fff}
+.withdraw-error{margin:2px 0 10px;padding:10px 12px;border-radius:11px;background:#3a1620;border:1px solid #8a3a4a;color:#ff9baa;font-size:10px;font-weight:800;line-height:1.4}
+.withdraw-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:9px;margin-top:2px}
+.withdraw-actions .secondary{padding:13px;font-size:12px}
+.history-row{display:grid;grid-template-columns:1.4fr 1fr auto;align-items:center;gap:8px;padding:10px 2px;border-top:1px solid #22314c}
+.history-row:first-of-type{border-top:0}
+.history-row div{display:grid;gap:2px}
+.history-row b{font-size:11px;color:#fff}
+.history-row small{font-size:8.5px;color:#8293b2}
+.history-status{font-size:8.5px;font-weight:1000;letter-spacing:.5px;padding:5px 8px;border-radius:8px;background:#3a2f16;color:#ffcf6b;white-space:nowrap;justify-self:end}
+.history-status.completed{background:#163b2a;color:#5dff9d}
 
 
 .pause-overlay {
