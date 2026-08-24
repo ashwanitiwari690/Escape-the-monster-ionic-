@@ -1,10 +1,10 @@
 import { bootstrapApplication } from '@angular/platform-browser';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
-import { provideIonicAngular } from '@ionic/angular/standalone';
 import { provideRouter } from '@angular/router';
 import { AppComponent } from './app/app.component';
 import { routes } from './app/app.routes';
 
 bootstrapApplication(AppComponent, {
-  providers: [provideIonicAngular(), provideRouter(routes), provideHttpClient()]
+  providers: [provideZonelessChangeDetection(), provideRouter(routes), provideHttpClient()]
 }).catch(error => console.error(error));
