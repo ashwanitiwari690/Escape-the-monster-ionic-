@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, ViewEncapsulation, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
+import { AppVerificationService } from './services/app-verification.service';
 
 type Screen = 'home' | 'game' | 'shop' | 'result' | 'settings' | 'profile';
 type Power = 'shield' | 'magnet' | 'speed';
@@ -157,8 +158,12 @@ export class AppComponent implements OnDestroy {
   private boundaryCooldownUntil = 0;
   private damageCooldownUntil = 0;
 
-  constructor(private readonly router: Router) {
+  constructor(private readonly router: Router, private readonly appVerification: AppVerificationService) {
     this.resetMap();
+    // Fire-and-forget: lets Earnivo credit a pending "App Promotion" reward
+    // for this device. Safe to call on every launch (see
+    // APP_PROMOTION_VERIFICATION_INTEGRATION.md) — never blocks startup.
+    this.appVerification.confirmInstall();
     this.rewardedAdClockTimer = window.setInterval(() => this.rewardedAdClock.set(Date.now()), 1000);
     this.routeSubscription = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
