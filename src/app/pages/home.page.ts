@@ -16,11 +16,12 @@ import { AppComponent } from '../app.component';
     <p>Run fast. Grab coins. Survive longer.</p>
   </div>
   <button class="primary" type="button" (click)="app.start()">PLAY NOW <span>▶</span></button>
-  <button class="reward-ad-button" type="button" [class.cooldown]="!app.rewardedAdAvailable()" [disabled]="!app.rewardedAdAvailable()" (click)="app.watchRewardedAd()" aria-label="Watch rewarded video for 100 coins">
+  <button class="reward-ad-button" type="button" [class.cooldown]="!app.rewardedAdAvailable() || app.rewardAdBusy()" [disabled]="!app.rewardedAdAvailable() || app.rewardAdBusy()" [attr.aria-label]="'Watch rewarded video for ' + app.rewardedAdCoins + ' coins'" (click)="app.watchRewardedAd()">
     <span class="reward-video-icon">▶</span>
-    <span class="reward-copy"><b>{{ app.rewardedAdAvailable() ? 'WATCH VIDEO' : 'VIDEO REWARD COOLDOWN' }}</b><small>{{ app.rewardedAdAvailable() ? 'Watch once • earn +100 coins' : 'Available again in ' + app.rewardedAdCountdown() }}</small></span>
-    <span class="reward-coins"><span class="coin-mini"></span> +100</span>
+    <span class="reward-copy"><b>{{ app.rewardAdBusy() ? 'LOADING AD…' : app.rewardedAdAvailable() ? 'WATCH VIDEO' : 'VIDEO REWARD COOLDOWN' }}</b><small>{{ app.rewardAdBusy() ? 'Please wait' : app.rewardedAdAvailable() ? 'Watch once • earn +' + app.rewardedAdCoins + ' coins' : 'Available again in ' + app.rewardedAdCountdown() }}</small></span>
+    <span class="reward-coins"><span class="coin-mini"></span> +{{ app.rewardedAdCoins }}</span>
   </button>
+  @if (app.message()) { <div class="shop-message">{{ app.message() }}</div> }
   <div class="home-actions"><button class="secondary" type="button" (click)="app.go('shop')">🛒 POWER SHOP</button><button class="secondary purple" type="button" (click)="app.go('settings')">⚙ SETTINGS</button></div>
   <div class="stats">
     <div><span>🏆</span><b>{{ app.high() }}</b><small>BEST SCORE</small></div>

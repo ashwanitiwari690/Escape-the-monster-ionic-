@@ -21,11 +21,26 @@ import { AppComponent } from '../app.component';
     <div class="enemy" [class]="'enemy ' + app.levelMonster()" [style.left.%]="app.monster.x * 100" [style.top.%]="app.monster.y * 100"><i class="e-eye e-left"></i><i class="e-eye e-right"></i><i class="e-mouth"></i></div>
     @if (app.shield()) { <div class="shield-ring" [style.left.%]="app.player.x * 100" [style.top.%]="app.player.y * 100"></div> }
     @if (app.message()) { <div class="toast">{{ app.message() }}</div> }
-    @if (app.paused()) {
+    @if (app.paused() && !app.continueOfferOpen()) {
       <div class="pause-overlay" role="status" aria-live="polite">
         <div class="pause-card">
           <strong>GAME PAUSED</strong>
           <span>Press ▶ above to continue</span>
+        </div>
+      </div>
+    }
+    @if (app.continueOfferOpen()) {
+      <div class="pause-overlay continue-overlay" role="dialog" aria-modal="true" aria-label="Continue with an extra life">
+        <div class="continue-card">
+          <span class="continue-icon">💔</span>
+          <strong>OUT OF LIVES!</strong>
+          <span>Watch a short video for +1 life and keep this run going</span>
+          @if (app.continueAdError()) { <div class="reward-ad-error">{{ app.continueAdError() }}</div> }
+          <button class="reward-ad-button continue-watch-button" type="button" [disabled]="app.rewardAdBusy()" (click)="app.watchContinueAd()">
+            <span class="reward-video-icon">▶</span>
+            <span class="reward-copy"><b>{{ app.rewardAdBusy() ? 'LOADING AD…' : 'WATCH AD • +1 LIFE' }}</b><small>{{ app.rewardAdBusy() ? 'Please wait' : 'Free — one per run' }}</small></span>
+          </button>
+          <button class="secondary continue-decline-button" type="button" [disabled]="app.rewardAdBusy()" (click)="app.declineContinue()">NO THANKS, END RUN</button>
         </div>
       </div>
     }
