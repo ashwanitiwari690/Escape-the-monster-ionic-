@@ -2,6 +2,9 @@ import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, ViewEncaps
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 import { AppVerificationService } from './services/app-verification.service';
+import { AdmobService } from './services/admob.service';
+import { ConnectivityService } from './services/connectivity.service';
+import { REWARD_AMOUNTS } from './config/admob.config';
 
 type Screen = 'home' | 'game' | 'shop' | 'result' | 'settings' | 'profile';
 type Power = 'shield' | 'magnet' | 'speed';
@@ -71,16 +74,27 @@ function readStoredString(key: string, fallback: string): string {
           <button class="icon-button" type="button" (click)="go('settings')" aria-label="Settings">⚙</button>
         </div>
       </header>
-      <router-outlet></router-outlet>
+      @if (connectivity.online()) {
+        <router-outlet></router-outlet>
+      } @else {
+        <section class="offline-screen" role="alert">
+          <div class="offline-card">
+            <div class="offline-icon">📡</div>
+            <h1>NO INTERNET CONNECTION</h1>
+            <p>Escape the Monster needs an internet connection to load ads and save your rewards. Please reconnect to keep playing.</p>
+            <button class="primary" type="button" (click)="connectivity.recheck()">TRY AGAIN</button>
+          </div>
+        </section>
+      }
       @if (rewardAdOpen()) {
         <div class="reward-ad-backdrop" role="dialog" aria-modal="true" aria-label="Rewarded video">
           <section class="reward-ad-modal">
             <button class="reward-ad-close" type="button" (click)="closeRewardedAd()" aria-label="Close video">×</button>
-            <div class="reward-ad-heading"><span class="reward-play-icon">▶</span><div><b>REWARDED VIDEO</b><small>Watch the full video to earn {{ rewardedAdCoins }} coins</small></div></div>
+            <div class="reward-ad-heading"><span class="reward-play-icon">▶</span><div><b>REWARDED VIDEO</b><small>{{ rewardAdSubtitle() }}</small></div></div>
             <video class="reward-video" [src]="rewardedVideoUrl" playsinline preload="metadata" controls (ended)="completeRewardedAd()" (error)="rewardVideoError()"></video>
             @if (rewardAdError()) { <div class="reward-ad-error">Video is not available yet. Add your future rewarded video to <b>src/assets/ads/rewarded-video.mp4</b>.</div> }
             @if (!rewardAdCompleted()) { <p class="reward-ad-note">The reward is credited only after the video reaches the end.</p> }
-            @if (rewardAdCompleted()) { <div class="reward-success">🪙 +{{ rewardedAdCoins }} COINS ADDED!</div> }
+            @if (rewardAdCompleted()) { <div class="reward-success">🎁 {{ rewardAdSuccessText() }}</div> }
           </section>
         </div>
       }
@@ -116,13 +130,22 @@ export class AppComponent implements OnDestroy {
   readonly magnetCount = signal(Math.floor(readStoredNumber(STORAGE.magnets, 0)));
   readonly speedBoostCount = signal(Math.floor(readStoredNumber(STORAGE.speedBoosts, 0)));
   readonly musicPlaying = signal(false);
-  readonly rewardedAdCoins = 100;
+  readonly rewardedAdCoins = REWARD_AMOUNTS.homeVideoCoins;
   readonly rewardAdOpen = signal(false);
   readonly rewardAdCompleted = signal(false);
   readonly rewardAdError = signal(false);
   readonly rewardedAdNextAvailable = signal(readStoredNumber(STORAGE.rewardedAdNext, 0));
   readonly rewardedAdClock = signal(Date.now());
   readonly rewardedVideoUrl = 'assets/ads/rewarded-video.mp4';
+  /** True while any rewarded ad (native or the web fallback) is loading or showing — shared by every "watch ad" button so requests can never overlap. */
+  readonly rewardAdBusy = signal(false);
+  readonly rewardAdSubtitle = signal('Watch the full video to earn the reward.');
+  readonly rewardAdSuccessText = signal('');
+  /** Game-over "watch ad for +1 life" prompt, offered at most once per run. */
+  readonly continueOfferOpen = signal(false);
+  readonly continueAdError = signal('');
+  /** Result screen "double your coins" reward, claimable once per run. */
+  readonly doubleCoinsClaimed = signal(false);
 
   player: Point = { x: 0.5, y: 0.78 };
   monster: Point = { x: 0.5, y: 0.12 };
@@ -157,14 +180,24 @@ export class AppComponent implements OnDestroy {
   private monsterElement: HTMLElement | null = null;
   private boundaryCooldownUntil = 0;
   private damageCooldownUntil = 0;
+  private continueOfferUsedThisRun = false;
+  private pendingWebRewardResolve?: (granted: boolean) => void;
 
-  constructor(private readonly router: Router, private readonly appVerification: AppVerificationService) {
+  constructor(
+    private readonly router: Router,
+    private readonly appVerification: AppVerificationService,
+    private readonly admob: AdmobService,
+    public readonly connectivity: ConnectivityService
+  ) {
     this.resetMap();
     // Fire-and-forget: lets Earnivo credit a pending "App Promotion" reward
     // for this device. Safe to call on every launch (see
     // APP_PROMOTION_VERIFICATION_INTEGRATION.md) — never blocks startup.
     this.appVerification.confirmInstall();
-    this.rewardedAdClockTimer = window.setInterval(() => this.rewardedAdClock.set(Date.now()), 1000);
+    void this.admob.initialize().then(() => {
+      if (this.screen() !== 'game') void this.admob.showBanner();
+    });
+    this.startRewardedAdClockIfNeeded();
     this.routeSubscription = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe(event => {
@@ -175,6 +208,11 @@ export class AppComponent implements OnDestroy {
         const next = routeScreen[path] ?? 'home';
         if (next !== 'game' && this.screen() === 'game') this.stopGameLoop();
         this.screen.set(next);
+        // Keep the banner off the touch controls during actual gameplay, and
+        // restore it everywhere else. Cheap to call on every navigation —
+        // AdmobService no-ops when the banner is already in the right state.
+        if (next === 'game') void this.admob.hideBanner();
+        else void this.admob.showBanner();
       });
   }
 
@@ -215,6 +253,10 @@ export class AppComponent implements OnDestroy {
     if (hasSpeedBoost) this.speedBoostCount.update(v => Math.max(0, v - 1));
     this.savePowerInventory();
     this.collectedThisRun.set(0);
+    this.continueOfferUsedThisRun = false;
+    this.continueOfferOpen.set(false);
+    this.continueAdError.set('');
+    this.doubleCoinsClaimed.set(false);
     this.player = { x: 0.5, y: 0.78 };
     this.monster = { x: 0.5, y: 0.12 };
     this.playerElement = null;
@@ -237,6 +279,10 @@ export class AppComponent implements OnDestroy {
   }
 
   pauseToHome(): void {
+    // Inert while the "watch ad to continue" prompt is up — the player must
+    // choose one of its own buttons rather than bypassing it via the HUD.
+    if (this.continueOfferOpen()) return;
+
     // The HUD button is a true pause/resume control. Keep the current game
     // state in place instead of navigating away, so the same button can resume
     // the exact run without resetting the map, timer, coins or monster position.
@@ -253,8 +299,13 @@ export class AppComponent implements OnDestroy {
   }
 
   private resumeGame(): void {
-    if (!this.paused() || this.screen() !== 'game' || this.finishing) return;
+    if (!this.paused() || this.screen() !== 'game' || this.finishing || this.continueOfferOpen()) return;
+    this.resumeLoop();
+    this.playSfx('click');
+  }
 
+  /** Restarts the RAF/interval loop from a paused state — shared by the HUD pause button and the post-continue-ad resume. */
+  private resumeLoop(): void {
     this.stopGameLoop();
     this.paused.set(false);
     this.last = performance.now();
@@ -269,7 +320,6 @@ export class AppComponent implements OnDestroy {
       if (this.time() === 0) this.finish('timeout');
     }, 1000);
     this.animation = requestAnimationFrame(now => this.loop(now, sessionId));
-    this.playSfx('click');
   }
 
   private resetMap(): void {
@@ -370,7 +420,7 @@ export class AppComponent implements OnDestroy {
     this.monster = { x: Math.random(), y: 0.08 };
     this.playSfx('hit');
     this.vibrate(70);
-    if (this.lives() <= 0) this.finish('lives');
+    if (this.lives() <= 0) this.handleLivesDepleted();
   }
 
   private handleBoundaryCollision(now: number): void {
@@ -392,7 +442,22 @@ export class AppComponent implements OnDestroy {
     this.playSfx('hit');
     this.vibrate(70);
     window.setTimeout(() => this.message.set(''), 900);
-    if (this.lives() <= 0) this.finish('lives');
+    if (this.lives() <= 0) this.handleLivesDepleted();
+  }
+
+  /** Offers one "watch ad for +1 life" prompt per run instead of ending it immediately; every subsequent loss ends the run as normal. */
+  private handleLivesDepleted(): void {
+    if (this.continueOfferUsedThisRun) {
+      this.finish('lives');
+      return;
+    }
+    this.continueOfferUsedThisRun = true;
+    this.paused.set(true);
+    this.stopGameLoop();
+    this.stopMusic();
+    this.continueAdError.set('');
+    this.continueOfferOpen.set(true);
+    this.playSfx('error');
   }
 
   private renderWorldPositions(): void {
@@ -471,6 +536,16 @@ export class AppComponent implements OnDestroy {
     // leaving PlayPageComponent mounted at /play, which looked like a frozen game.
     this.screen.set('result');
     void this.router.navigateByUrl('/result');
+
+    // Natural breakpoint for a full-screen ad — frequency-capped (see
+    // admob.config.ts) so it doesn't show after every single run. Delayed
+    // slightly so the result screen has already painted underneath it, and
+    // skipped entirely for a run where the player already watched (or was
+    // offered) a rewarded "continue" ad — stacking a second full-screen ad
+    // right after that would hurt retention for no extra revenue.
+    if (!this.continueOfferUsedThisRun) {
+      window.setTimeout(() => void this.admob.maybeShowInterstitialAtBreakpoint(), 550);
+    }
   }
 
   buy(power: Power): void {
@@ -665,36 +740,162 @@ export class AppComponent implements OnDestroy {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  watchRewardedAd(): void {
+  /**
+   * Ticks `rewardedAdClock` once a second, but only while a cooldown is
+   * actually counting down — not for the app's whole lifetime. The clock only
+   * exists to drive the Home screen's countdown text, so running it
+   * unconditionally forever (including mid-game at 60fps, or while
+   * backgrounded) would be a wasted timer competing for no visible benefit.
+   * Self-stops the moment the cooldown expires.
+   */
+  private startRewardedAdClockIfNeeded(): void {
+    if (this.rewardedAdClockTimer || this.rewardedAdNextAvailable() <= Date.now()) return;
+    this.rewardedAdClockTimer = window.setInterval(() => {
+      this.rewardedAdClock.set(Date.now());
+      if (this.rewardedAdAvailable()) {
+        window.clearInterval(this.rewardedAdClockTimer);
+        this.rewardedAdClockTimer = undefined;
+      }
+    }, 1000);
+  }
+
+  /**
+   * Single entry point every rewarded-ad placement in the app calls (home
+   * coins, result double-coins, shop free power-up, game-over continue).
+   * Routes to the real AdMob rewarded video on native (Android) and to a
+   * local simulated video overlay on web, so the UI stays testable in a
+   * desktop browser (see ADMOB_AND_OFFLINE_GATE_GUIDE.md §6).
+   *
+   * Resolves true ONLY when the ad's own reward confirmation fires — every
+   * caller below credits its reward exclusively on a `true` result, never
+   * optimistically on the button tap or the ad merely starting.
+   *
+   * At most one rewarded ad can be in flight app-wide (`rewardAdBusy`), so
+   * rapid or repeated taps — on the same button or a different one — can
+   * never trigger overlapping ad requests or double-grant a reward.
+   */
+  private async requestRewardedAd(subtitle: string): Promise<boolean> {
+    if (this.rewardAdBusy()) return false;
+    this.rewardAdBusy.set(true);
+    try {
+      if (this.admob.isSupported) return await this.admob.showRewarded();
+
+      this.rewardAdSubtitle.set(subtitle);
+      this.rewardAdOpen.set(true);
+      this.rewardAdCompleted.set(false);
+      this.rewardAdError.set(false);
+      this.ensureAudio();
+      this.playSfx('click');
+      window.setTimeout(() => {
+        const player = document.querySelector('.reward-video') as HTMLVideoElement | null;
+        if (!player) return;
+        player.currentTime = 0;
+        player.play().catch(() => this.rewardAdError.set(true));
+      });
+      return await new Promise<boolean>(resolve => { this.pendingWebRewardResolve = resolve; });
+    } finally {
+      this.rewardAdBusy.set(false);
+    }
+  }
+
+  /** Home screen — "watch video" for a fixed coin reward, on a cooldown. */
+  async watchRewardedAd(): Promise<void> {
+    if (this.rewardAdBusy()) return;
     if (!this.rewardedAdAvailable()) {
       this.message.set(`NEXT REWARD IN ${this.rewardedAdCountdown()}`);
       window.setTimeout(() => this.message.set(''), 1400);
       return;
     }
-    this.rewardAdOpen.set(true);
-    this.rewardAdCompleted.set(false);
-    this.rewardAdError.set(false);
-    this.ensureAudio();
-    this.playSfx('click');
-    window.setTimeout(() => {
-      const player = document.querySelector('.reward-video') as HTMLVideoElement | null;
-      if (!player) return;
-      player.currentTime = 0;
-      player.play().catch(() => this.rewardAdError.set(true));
-    });
-  }
-
-  completeRewardedAd(): void {
-    if (!this.rewardAdOpen() || this.rewardAdCompleted() || !this.rewardedAdAvailable()) return;
-    this.rewardAdCompleted.set(true);
+    const granted = await this.requestRewardedAd(`Watch the full video to earn ${this.rewardedAdCoins} coins`);
+    if (!granted) {
+      this.showAdNotCompletedMessage();
+      return;
+    }
     this.coins.update(value => value + this.rewardedAdCoins);
-    this.rewardedAdNextAvailable.set(Date.now() + 2 * 60 * 60 * 1000);
+    this.rewardedAdNextAvailable.set(Date.now() + REWARD_AMOUNTS.homeVideoCooldownMs);
+    this.startRewardedAdClockIfNeeded();
     this.saveCoins();
     this.saveRewardedAdState();
+    this.rewardAdSuccessText.set(`+${this.rewardedAdCoins} COINS ADDED!`);
     this.playSfx('coin');
     this.vibrate([20, 40, 20, 40, 80]);
     this.message.set(`+${this.rewardedAdCoins} COINS • NEXT VIDEO IN 2 HOURS`);
     window.setTimeout(() => this.message.set(''), 1800);
+  }
+
+  /** Result screen — doubles the coins just earned this run. One claim per run. */
+  async watchDoubleCoinsAd(): Promise<void> {
+    if (this.rewardAdBusy() || this.doubleCoinsClaimed() || this.collectedThisRun() <= 0) return;
+    const bonus = this.collectedThisRun() * REWARD_AMOUNTS.doubleCoinsMultiplier;
+    const granted = await this.requestRewardedAd(`Watch the full video to double the ${this.collectedThisRun()} coins you just earned`);
+    if (!granted) {
+      this.showAdNotCompletedMessage();
+      return;
+    }
+    this.doubleCoinsClaimed.set(true);
+    this.coins.update(value => value + bonus);
+    this.saveCoins();
+    this.rewardAdSuccessText.set(`+${bonus} BONUS COINS ADDED!`);
+    this.playSfx('coin');
+    this.vibrate([20, 40, 20, 40, 80]);
+    this.message.set(`+${bonus} BONUS COINS!`);
+    window.setTimeout(() => this.message.set(''), 1800);
+  }
+
+  /** Shop — a free Shield in exchange for a watched ad, no coins spent. */
+  async watchShopAd(): Promise<void> {
+    if (this.rewardAdBusy()) return;
+    const granted = await this.requestRewardedAd('Watch the full video to get a free Shield');
+    if (!granted) {
+      this.showAdNotCompletedMessage();
+      return;
+    }
+    this.shieldCount.update(value => value + 1);
+    this.savePowerInventory();
+    this.rewardAdSuccessText.set('FREE SHIELD ADDED!');
+    this.playSfx('power');
+    this.message.set('🎁 FREE SHIELD ADDED TO YOUR INVENTORY!');
+    window.setTimeout(() => this.message.set(''), 1800);
+  }
+
+  /** Game-over "continue" prompt — one extra life per run in exchange for a watched ad. */
+  async watchContinueAd(): Promise<void> {
+    if (this.rewardAdBusy()) return;
+    this.continueAdError.set('');
+    const granted = await this.requestRewardedAd(`Watch the full video to get +${REWARD_AMOUNTS.continueExtraLives} life and keep running`);
+    if (!granted) {
+      if (this.admob.isSupported) this.continueAdError.set('Ad not completed — no reward given. You can try again.');
+      return;
+    }
+    this.continueOfferOpen.set(false);
+    this.lives.set(REWARD_AMOUNTS.continueExtraLives);
+    this.playSfx('shield');
+    this.vibrate([20, 40, 20, 40, 80]);
+    this.resumeLoop();
+  }
+
+  /** Declines the continue offer — ends the run exactly as a normal game-over would. */
+  declineContinue(): void {
+    if (this.rewardAdBusy()) return;
+    this.continueOfferOpen.set(false);
+    this.finish('lives');
+  }
+
+  private showAdNotCompletedMessage(): void {
+    // The web fallback only resolves false when the player closes the overlay
+    // themselves — that's an intentional cancel, not a failure worth a toast.
+    if (!this.admob.isSupported) return;
+    this.message.set('AD NOT COMPLETED — NO REWARD GIVEN');
+    window.setTimeout(() => this.message.set(''), 1600);
+  }
+
+  completeRewardedAd(): void {
+    if (!this.rewardAdOpen() || this.rewardAdCompleted()) return;
+    this.rewardAdCompleted.set(true);
+    this.playSfx('coin');
+    const resolve = this.pendingWebRewardResolve;
+    this.pendingWebRewardResolve = undefined;
+    resolve?.(true);
   }
 
   rewardVideoError(): void {
@@ -707,6 +908,9 @@ export class AppComponent implements OnDestroy {
     this.rewardAdOpen.set(false);
     this.rewardAdError.set(false);
     this.playSfx('click');
+    const resolve = this.pendingWebRewardResolve;
+    this.pendingWebRewardResolve = undefined;
+    resolve?.(false);
   }
 
   private saveRewardedAdState(): void {

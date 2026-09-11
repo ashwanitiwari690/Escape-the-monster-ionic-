@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900;1000&display=swap');
+:root{--ad-banner-space:0px}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#050812}body{min-height:100dvh;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}button{font:inherit}button:focus-visible{outline:3px solid #8ec5ff;outline-offset:2px}input{font:inherit}
 
 /* Global Escape the Monster styles moved here to avoid Angular component-style budget warnings. */
@@ -164,7 +165,7 @@
 .page {
   width: min(100%, 560px);
   margin: auto;
-  padding: 14px 13px 18px
+  padding: 14px 13px calc(18px + var(--ad-banner-space, 0px))
 }
 
 .home {
@@ -482,7 +483,7 @@
 .reward-ad-button { width: 100%; min-height: 78px; margin-top: 11px; border: 1px solid #5d75a4; border-radius: 18px; padding: 10px 13px; display: grid; grid-template-columns: 50px 1fr auto; align-items: center; gap: 10px; text-align: left; color: #fff; background: linear-gradient(135deg, #182b4a, #102039 55%, #1a2750); box-shadow: 0 7px 0 #050a14, inset 0 1px #ffffff16, 0 12px 30px #0005; transition: transform .16s ease, filter .16s ease; }
 .reward-ad-button:not(:disabled):active { transform: translateY(3px); box-shadow: 0 4px 0 #050a14; }
 .reward-ad-button:not(:disabled):hover { filter: brightness(1.08); }
-.reward-ad-button.cooldown { opacity: .72; filter: saturate(.55); }
+.reward-ad-button.cooldown, .reward-ad-button:disabled { opacity: .72; filter: saturate(.55); cursor: not-allowed; }
 .reward-video-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: linear-gradient(#ffcc57, #ed8d0d); color: #211400; font-size: 21px; box-shadow: inset 0 1px #fff7, 0 5px 12px #0007; }
 .reward-copy { display: grid; gap: 3px; }
 .reward-copy b { font-size: 14px; letter-spacing: .6px; }
@@ -2221,3 +2222,60 @@ app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page,
 @media (prefers-reduced-motion: reduce) {
   .pause-overlay, .pause-card { animation: none !important; }
 }
+
+/* Offline gate */
+.offline-screen {
+  width: 100%;
+  min-height: calc(100dvh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.offline-card {
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  padding: 32px 24px;
+  border-radius: 22px;
+  border: 1px solid #2d3f61;
+  background: linear-gradient(145deg, #121d32, #0d1728);
+  box-shadow: 0 20px 60px #0007, inset 0 1px #ffffff0a;
+}
+.offline-icon { font-size: 48px; margin-bottom: 14px; }
+.offline-card h1 { font-size: 20px; margin: 0 0 10px; letter-spacing: .5px; }
+.offline-card p { font-size: 12px; opacity: .72; line-height: 1.5; margin: 0 0 4px; }
+.offline-card .primary { max-width: 260px; margin: 18px auto 0; }
+
+/* Shop — free power-up via rewarded ad */
+.ad-shop-card { border-color: #5d75a4; background: linear-gradient(135deg, #182b4a, #102039 55%, #1a2750); }
+.shop-card .watch-ad-button {
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(#ffcc57, #ed8d0d);
+  color: #211400;
+  font-weight: 1000;
+  padding: 11px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.shop-card .watch-ad-button:disabled { opacity: .6; filter: saturate(.6); cursor: not-allowed; }
+
+/* Game-over "watch ad to continue" prompt */
+.continue-overlay { z-index: 40; }
+.continue-card {
+  display: grid;
+  gap: 8px;
+  width: min(88vw, 300px);
+  padding: 22px 20px;
+  text-align: center;
+  border: 1px solid #5b79b0;
+  border-radius: 18px;
+  background: #111b31ee;
+  box-shadow: 0 12px 30px #0008;
+}
+.continue-icon { font-size: 34px; }
+.continue-card strong { font-size: 17px; letter-spacing: .8px; }
+.continue-card > span { font-size: 11px; color: #9eb2d4; line-height: 1.4; margin-bottom: 4px; }
+.continue-watch-button { margin-top: 4px; width: 100%; }
+.continue-decline-button { margin-top: 2px; }
