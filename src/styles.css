@@ -1,6 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900;1000&display=swap');
-:root{--ad-banner-space:0px}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#050812}body{min-height:100dvh;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}button{font:inherit}button:focus-visible{outline:3px solid #8ec5ff;outline-offset:2px}input{font:inherit}
+:root {
+  --ad-banner-space: 0px;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --topbar-height: calc(64px + var(--sat));
+}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;min-height:100%;background:#050812}body{min-height:100dvh;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}button{font:inherit}button:focus-visible{outline:3px solid #8ec5ff;outline-offset:2px}input{font:inherit}
 
 /* Global Escape the Monster styles moved here to avoid Angular component-style budget warnings. */
 :host { display:block }
@@ -14,11 +21,12 @@
 }
 
 .topbar {
-  height: 64px;
+  min-height: 64px;
+  height: var(--topbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px 8px 15px;
+  padding: calc(8px + var(--sat)) calc(12px + var(--sar)) 8px calc(15px + var(--sal));
   background: rgba(5, 9, 20, .94);
   backdrop-filter: blur(16px);
   position: sticky;
@@ -165,7 +173,7 @@
 .page {
   width: min(100%, 560px);
   margin: auto;
-  padding: 14px 13px calc(18px + var(--ad-banner-space, 0px))
+  padding: 14px calc(13px + var(--sar)) calc(18px + var(--ad-banner-space, 0px) + var(--sab)) calc(13px + var(--sal));
 }
 
 .home {
@@ -562,9 +570,9 @@
 }
 
 .game {
-  padding: 4px 8px 10px;
-  min-height: calc(100dvh - 64px);
-  height: calc(100dvh - 64px);
+  padding: 4px calc(8px + var(--sar)) calc(10px + var(--sab)) calc(8px + var(--sal));
+  min-height: calc(100dvh - var(--topbar-height));
+  height: calc(100dvh - var(--topbar-height));
   display: flex;
   flex-direction: column;
   gap: 0
@@ -1273,12 +1281,14 @@
 
 @media(max-height:690px) {
   .topbar {
-    height: 58px
+    min-height: 58px;
+    height: calc(58px + var(--sat));
+    padding-top: calc(6px + var(--sat));
   }
 
   .game {
-    min-height: calc(100dvh - 58px);
-    height: calc(100dvh - 58px)
+    min-height: calc(100dvh - 58px - var(--sat));
+    height: calc(100dvh - 58px - var(--sat))
   }
 
   .hud {
@@ -1919,9 +1929,9 @@
 .level-30 .enemy:before, .level-30 .enemy:after, .level-30 .enemy .e-eye, .level-30 .enemy .e-mouth { display:none; }
 /* v1.5: tight game layout + low-latency touch joystick */
 .game {
-  padding: 0 8px 6px;
-  min-height: calc(100dvh - 64px);
-  height: calc(100dvh - 64px);
+  padding: 0 calc(8px + var(--sar)) calc(6px + var(--sab)) calc(8px + var(--sal));
+  min-height: calc(100dvh - var(--topbar-height));
+  height: calc(100dvh - var(--topbar-height));
   overflow: hidden;
 }
 
@@ -1955,11 +1965,11 @@
 }
 
 .game .control-dock {
-  flex: 0 0 116px;
-  height: 116px;
-  min-height: 116px;
+  flex: 0 0 calc(116px + var(--sab));
+  height: calc(116px + var(--sab));
+  min-height: calc(116px + var(--sab));
   margin: 0;
-  padding: 0;
+  padding: 0 0 var(--sab) 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2128,7 +2138,7 @@
   }
 }
 /* v1.7 page routing + safe persistence */
-app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page, app-profile-page { display:block; min-height:calc(100dvh - 64px); }
+app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page, app-profile-page { display:block; min-height:calc(100dvh - var(--topbar-height)); }
 .game .level-banner { margin: 4px 0 5px; }
 .game .world { border-radius: 20px; }
 .result-coin { vertical-align:middle; }
@@ -2226,7 +2236,7 @@ app-home-page, app-play-page, app-shop-page, app-settings-page, app-result-page,
 /* Offline gate */
 .offline-screen {
   width: 100%;
-  min-height: calc(100dvh - 64px);
+  min-height: calc(100dvh - var(--topbar-height));
   display: flex;
   align-items: center;
   justify-content: center;
