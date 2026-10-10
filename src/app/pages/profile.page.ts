@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/c
 import { AppComponent } from '../app.component';
 import { GameConfig, GameRedemptionService, RedemptionError } from '../services/game-redemption.service';
 
-/** Used only until GET /api/games responds (or if it's unreachable) — the backend's own minimumCoins is authoritative once loaded. */
-const FALLBACK_MIN_WITHDRAW_COINS = 1000;
+/** Minimum coins required to display and use the withdrawal option. */
+const FALLBACK_MIN_WITHDRAW_COINS = 100;
 const PENDING_KEY_STORAGE = 'etm-withdraw-pending';
 
 const ERROR_MESSAGES: Partial<Record<RedemptionError['code'], string>> = {
@@ -81,6 +81,18 @@ interface SuccessInfo { coins: number; amount: string; }
         </div>
       }
     </article>
+  } @else {
+    <article class="settings-card credit-card">
+      <div class="credit-heading">
+        <span class="setting-icon">🔒</span>
+        <div><b>Coin Withdrawal Locked</b><small>Unlocks at {{ minWithdrawCoins() }} coins</small></div>
+      </div>
+      <div class="credit-wallet" style="margin-bottom: 8px;">
+        <span>PROGRESS</span>
+        <strong>{{ app.coins() }} / {{ minWithdrawCoins() }}</strong>
+      </div>
+      <small class="credit-note">Collect {{ minWithdrawCoins() - app.coins() }} more coins to reach 100 coins and unlock withdrawal.</small>
+    </article>
   }
 
   @if (successInfo(); as success) {
@@ -129,7 +141,10 @@ export class ProfilePageComponent {
    */
   readonly history = signal<{ date: string; coins: number; amount: number; status: string; game: string }[]>([]);
 
-  readonly minWithdrawCoins = computed(() => this.gameConfig()?.minimumCoins ?? FALLBACK_MIN_WITHDRAW_COINS);
+  readonly minWithdrawCoins = computed(() => {
+    const configMin = this.gameConfig()?.minimumCoins;
+    return typeof configMin === 'number' && configMin > 0 ? Math.min(100, configMin) : FALLBACK_MIN_WITHDRAW_COINS;
+  });
   readonly canWithdraw = computed(() => this.app.coins() >= this.minWithdrawCoins());
   readonly mobileValid = computed(() => /^\d{10}$/.test(this.app.withdrawMobileNumber()));
 

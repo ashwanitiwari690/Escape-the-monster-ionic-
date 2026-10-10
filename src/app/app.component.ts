@@ -123,7 +123,7 @@ export class AppComponent implements OnDestroy {
   readonly soundEnabled = signal(readStoredBool(STORAGE.sound, true));
   readonly musicEnabled = signal(readStoredBool(STORAGE.music, true));
   readonly musicVolume = signal(readStoredNumber(STORAGE.musicVolume, 100));
-  readonly sfxVolume = signal(readStoredNumber(STORAGE.sfxVolume, 92));
+  readonly sfxVolume = signal(readStoredNumber(STORAGE.sfxVolume, 100));
   readonly vibrationEnabled = signal(readStoredBool(STORAGE.vibration, true));
   readonly withdrawMobileNumber = signal(readStoredString(STORAGE.withdrawMobile, ''));
   readonly shieldCount = signal(Math.floor(readStoredNumber(STORAGE.shields, 0)));
@@ -935,16 +935,16 @@ export class AppComponent implements OnDestroy {
     const ctx = this.audioContext;
     const master = ctx.createGain();
     const normalizedVolume = Math.max(0, Math.min(this.musicVolume() / 100, 1));
-    master.gain.value = Math.min(Math.pow(normalizedVolume, 0.6) * 1.08, 1);
+    master.gain.value = Math.min(Math.pow(normalizedVolume, 0.5) * 1.35, 1.4);
     master.connect(ctx.destination);
     const now = ctx.currentTime;
     const chords = [
       [196, 247, 294], [174, 220, 261], [165, 208, 247], [185, 233, 277]
     ];
     const chord = chords[this.musicStep % chords.length];
-    chord.forEach((freq, i) => this.playTone(freq, now + i * 0.025, 1.65, 0.068, 'sine', master));
+    chord.forEach((freq, i) => this.playTone(freq, now + i * 0.025, 1.65, 0.18, 'sine', master));
     const melody = [392, 440, 494, 440, 392, 330, 370, 392];
-    melody.forEach((freq, i) => this.playTone(freq, now + i * 0.2, 0.16, 0.082, 'triangle', master));
+    melody.forEach((freq, i) => this.playTone(freq, now + i * 0.2, 0.16, 0.24, 'triangle', master));
     this.musicStep += 1;
     this.musicTimer = window.setTimeout(() => {
       master.disconnect();
@@ -965,12 +965,12 @@ export class AppComponent implements OnDestroy {
     if (!ctx) return;
     const now = ctx.currentTime;
     const gain = ctx.createGain();
-    gain.gain.value = Math.min(this.sfxVolume() / 100, 1);
+    gain.gain.value = Math.min(Math.pow(this.sfxVolume() / 100, 0.6) * 1.25, 1.4);
     gain.connect(ctx.destination);
     const configs: Record<string, [number, number, OscillatorType, number]> = {
-      click: [420, 0.06, 'square', 0.08], coin: [880, 0.13, 'sine', 0.12], hit: [90, 0.24, 'sawtooth', 0.18],
-      shield: [220, 0.28, 'triangle', 0.16], power: [520, 0.25, 'triangle', 0.15], error: [130, 0.18, 'square', 0.1],
-      finish: [660, 0.55, 'triangle', 0.16], start: [330, 0.3, 'sine', 0.12]
+      click: [420, 0.06, 'square', 0.22], coin: [880, 0.14, 'sine', 0.36], hit: [90, 0.26, 'sawtooth', 0.44],
+      shield: [220, 0.28, 'triangle', 0.36], power: [520, 0.26, 'triangle', 0.35], error: [130, 0.20, 'square', 0.26],
+      finish: [660, 0.55, 'triangle', 0.38], start: [330, 0.32, 'sine', 0.32]
     };
     const [freq, duration, type, level] = configs[kind];
     const osc = ctx.createOscillator();
