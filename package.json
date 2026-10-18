@@ -1,6 +1,6 @@
 {
   "name": "escape-the-monster",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "Optimized 2D Escape the Monster game with 30 progressive levels, boundary damage, persistent wallet and low-latency movement.",
   "scripts": {
