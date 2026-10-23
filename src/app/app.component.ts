@@ -10,7 +10,7 @@ type Screen = 'home' | 'game' | 'shop' | 'result' | 'settings' | 'profile';
 type Power = 'shield' | 'magnet' | 'speed';
 interface Point { x: number; y: number; }
 
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 const STORAGE = {
   coins: 'etm-coins',
   high: 'etm-high',

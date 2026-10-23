@@ -18,9 +18,9 @@
  *  3. Remove `initializeForTesting: true` in AdmobService.initialize().
  */
 export const AD_UNIT_IDS = {
-  banner: 'ca-app-pub-3940256099942544/6300978111',
-  interstitial: 'ca-app-pub-3940256099942544/1033173712',
-  rewarded: 'ca-app-pub-3940256099942544/5224354917'
+  banner: 'ca-app-pub-2030586584805301/5929207347',
+  interstitial: 'ca-app-pub-2030586584805301/9676880664',
+  rewarded: 'ca-app-pub-2030586584805301/6392156056'
 } as const;
 
 /** Show interstitials at most once every N finished runs (policy-safe pacing). */

@@ -40,10 +40,7 @@ export class AdmobService {
   initialize(): Promise<void> {
     if (!this.isSupported) return Promise.resolve();
     if (!this.initPromise) {
-      this.initPromise = AdMob.initialize({
-        // TODO: remove before a production release — see admob.config.ts.
-        initializeForTesting: true
-      })
+      this.initPromise = AdMob.initialize({})
         .then(() => {
           void this.preloadInterstitial();
           void this.preloadRewarded();
