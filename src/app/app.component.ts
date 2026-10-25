@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, ViewEncapsulation, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, ViewEncapsulation, effect, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
 import { AppVerificationService } from './services/app-verification.service';
@@ -182,6 +182,7 @@ export class AppComponent implements OnDestroy {
   private damageCooldownUntil = 0;
   private continueOfferUsedThisRun = false;
   private pendingWebRewardResolve?: (granted: boolean) => void;
+  private wasMusicPlayingBeforeAd = false;
 
   constructor(
     private readonly router: Router,
@@ -190,6 +191,21 @@ export class AppComponent implements OnDestroy {
     public readonly connectivity: ConnectivityService
   ) {
     this.resetMap();
+    // Synchronize background music with full-screen ads to comply with AdMob policy
+    effect(() => {
+      const isAdActive = this.admob.fullScreenAdActive();
+      if (isAdActive) {
+        this.wasMusicPlayingBeforeAd = this.musicPlaying();
+        if (this.wasMusicPlayingBeforeAd) {
+          this.stopMusic();
+        }
+      } else if (this.wasMusicPlayingBeforeAd) {
+        this.wasMusicPlayingBeforeAd = false;
+        if (this.musicEnabled() && this.screen() !== 'game') {
+          this.startMusic();
+        }
+      }
+    });
     // Fire-and-forget: lets Earnivo credit a pending "App Promotion" reward
     // for this device. Safe to call on every launch (see
     // APP_PROMOTION_VERIFICATION_INTEGRATION.md) — never blocks startup.
@@ -777,6 +793,8 @@ export class AppComponent implements OnDestroy {
   private async requestRewardedAd(subtitle: string): Promise<boolean> {
     if (this.rewardAdBusy()) return false;
     this.rewardAdBusy.set(true);
+    const musicWasPlaying = this.musicPlaying();
+    if (!this.admob.isSupported && musicWasPlaying) this.stopMusic();
     try {
       if (this.admob.isSupported) return await this.admob.showRewarded();
 
@@ -795,6 +813,9 @@ export class AppComponent implements OnDestroy {
       return await new Promise<boolean>(resolve => { this.pendingWebRewardResolve = resolve; });
     } finally {
       this.rewardAdBusy.set(false);
+      if (!this.admob.isSupported && musicWasPlaying && this.musicEnabled() && this.screen() !== 'game') {
+        this.startMusic();
+      }
     }
   }
 
